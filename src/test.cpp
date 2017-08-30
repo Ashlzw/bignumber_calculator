@@ -118,11 +118,10 @@ static void test_bignumber_div()
 	TEST_DIV(std::string("101"), std::string("101"), std::string("1"));
 	TEST_DIV(std::string("-101"), std::string("101"), std::string("-1"));
 	TEST_DIV(std::string("40"), std::string("1000"), std::string("25"));
-/*	TEST_DIV(std::string("98646549864"), std::string("85284543725746406280"), std::string("864546645"));
+	TEST_DIV(std::string("98646549864"), std::string("85284543725746406280"), std::string("864546645"));
 	TEST_DIV(std::string("98646549864"), std::string("-85284543725746406280"), std::string("-864546645"));
 	TEST_DIV(std::string("-2222222222222222222222222222222222222222222222222222"), std::string("-2222222222222222222222222222222222222222222222222222"), std::string("1"));
 	TEST_DIV(std::string("9"), std::string("99999999999999"), std::string("11111111111111"));
-*/
 }
 
 int main()
