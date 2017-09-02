@@ -1,35 +1,25 @@
 #include "bignumber.h"
 
-bignumber::bignumber(int len, char sign) :
-	_sign(sign),
-	_len(len),
-	_data(new char[len]())
-{
-}
-
 bignumber::bignumber(std::string & str)
 {	
 	parse_bignumber(str);
 	_len = str.size();
-	_data = new char[_len]{0};
 	fill_data_from_str(str);
 }
 
 bignumber::bignumber(const bignumber & bn)
 {
-	init(bn._len, bn._sign);
-	copy_from(bn._data);
+	init(bn._len, bn._sign, bn._data);
 }
 
 bignumber::~bignumber()
 {
-	delete []_data;
 }
 
 std::string bignumber::to_string()
-{
-	std::string str = std::string(_len, 0);
-	
+{	
+	std::string str;
+
 	if (_sign == 1)
 		str.push_back('-');
 	for (size_t i = 0; i < _len; i++)
@@ -43,7 +33,7 @@ std::string bignumber::to_string()
 
 int bignumber::valid_len()
 {
-	int len = _len;
+	int len = _data.size();
 
 	for (int i = len - 1; i >= 0; i--)
 	{
@@ -57,10 +47,8 @@ int bignumber::valid_len()
 }
 
 bignumber &bignumber::operator=(const bignumber & a)
-{
-	delete []_data;
-	init(a._len, a._sign);
-	copy_from(a._data);
+{	
+	init(a._len, a._sign, a._data);
 	return *this;
 }
 
@@ -115,7 +103,6 @@ void bignumber::trim_str(std::string & str)
 
 void bignumber::add_impl(const bignumber & a, const bignumber & b, bignumber &r)
 {
-	int length = r._len;
 	int carry = 0;
 
 	for (size_t i = 0; i < length; i++)
@@ -123,21 +110,22 @@ void bignumber::add_impl(const bignumber & a, const bignumber & b, bignumber &r)
 		if (i < a._len) carry += a._data[i];
 		if (i < b._len) carry += b._data[i];
 
-		r._data[i] = carry % BASE;
+		r._data.push_back(carry % BASE);
 		carry /= BASE;
 	}
+	if (carry)
+		r._data.push_back(carry);
 }
 
 void bignumber::sub_impl(const bignumber & a, const bignumber & b, bignumber & r)
 {
 	int borrow = 0;
-	int length = r._len;
 	char tmp = 0;
 
-	for (size_t i = 0; i < length && i < a._len; i++)
+	for (size_t i = 0; i < a._len; i++)
 	{
 		tmp = a._data[i] + BASE - borrow - ((i < b._len) ? b._data[i] : 0);
-		r._data[i] = tmp % BASE;
+		r._data.push_back(tmp % BASE);
 		borrow = 1 - tmp / BASE;
 	}
 }
@@ -146,6 +134,7 @@ void bignumber::mul_impl(const bignumber & a, const bignumber & b, bignumber & r
 {
 	int alen = a._len;
 	int blen = b._len;
+	char *tmp = new char[alen + blen]{0};
 	char carry = 0;
 
 	for (size_t i = 0; i < blen; i++)
@@ -153,17 +142,33 @@ void bignumber::mul_impl(const bignumber & a, const bignumber & b, bignumber & r
 		size_t j = 0;
 		for (; j < alen; j++)
 		{
-			carry += b._data[i] * a._data[j] + r._data[i + j];
-			r._data[i + j] = carry % BASE;
+			carry += b._data[i] * a._data[j] + tmp[i + j];
+			tmp[i + j] = carry % BASE;
 			carry /= BASE;
 		}
 
 		for (; j + i < alen + blen; j++)
 		{
-			r._data[i + j] = carry % BASE;
+			tmp[i + j] = carry % BASE;
 			carry /= BASE;
 		}
 	}
+	size_t sz = alen + blen;
+	for (int i = alen + blen - 1; i >= 0; --i)
+		if (tmp[i] == 0)
+			--sz;
+		else
+			break;
+	sz = sz ? sz : 1;
+	try
+	{
+		r._data = bignumber_data(tmp, tmp + sz);
+	}
+	catch (const std::exception&)
+	{
+		delete tmp;
+	}
+	delete tmp;
 }
 
 
@@ -200,7 +205,6 @@ int bignumber::no_sign_cmp(const bignumber & a, const bignumber & b)
 {
 	int alen = a._len;
 	int blen = b._len;
-
 	if (alen > blen)
 		return 1;
 	else if (alen < blen)
@@ -240,9 +244,9 @@ std::ostream &operator<<(std::ostream &os, bignumber &bn)
 
 bignumber operator+(const bignumber & a, const bignumber & b)
 {
-	int len = MAX(a._len, b._len) + 1;
+
 #if 1
-	bignumber ret(len, 0);
+	bignumber ret;
 
 	if (a._sign == b._sign)
 	{
@@ -276,8 +280,7 @@ bignumber operator+(const bignumber & a, const bignumber & b)
 
 bignumber operator-(const bignumber & a, const bignumber & b)
 {
-	int len = MAX(a._len, b._len);
-	bignumber ret(len, 0);
+	bignumber ret;
 #if 1
 	if (a._sign == 0 && b._sign == 0)
 	{
@@ -321,9 +324,10 @@ bignumber operator-(const bignumber & a, const bignumber & b)
 bignumber operator*(const bignumber & a, const bignumber & b)
 {
 	int len = a._len + b._len;
-	bignumber ret(len, a._sign == b._sign ? 0 : 1);
+	bignumber ret;
 
 	bignumber::mul_impl(a, b, ret);
+	ret.set_sign(a._sign == b._sign ? 0 : 1);
 	ret._len = ret.valid_len();
 
 	return ret;
@@ -331,26 +335,25 @@ bignumber operator*(const bignumber & a, const bignumber & b)
 
 bignumber operator/(const bignumber & a, const bignumber & b)
 {	
-	bignumber zero(1, 0);
-	bignumber two(std::string("2"));
+	bignumber ret("0");
+	bignumber two("2");
 	bignumber aTmp = a;
 	bignumber bTmp = b;
 
-	if (bignumber::cmp(bTmp, zero) == 0)
+	if (bignumber::cmp(bTmp, ret) == 0)
 	{
 		std::cerr << "Integer division by zero" << std::endl;
 	}
-	else if (bignumber::cmp(aTmp, zero) == 0)
-		return zero;
+	else if (bignumber::cmp(aTmp, ret) == 0)
+		return ret;
 
-	bignumber ret(std::string("0"));
 	char asign = aTmp._sign, bsign = bTmp._sign;
 	aTmp._sign = 0;
 	bTmp._sign = 0;
 
 	while (bignumber::cmp(aTmp, bTmp) >= 0)
 	{
-		bignumber multi(std::string("1"));
+		bignumber multi("1");
 		bignumber tmp = bTmp;
 		while (bignumber::cmp(aTmp, (tmp * two)) >= 0)
 		{
@@ -360,7 +363,7 @@ bignumber operator/(const bignumber & a, const bignumber & b)
 		aTmp = aTmp - tmp;
 		ret = ret + multi;
 	}
-	asign == bsign ? ret.set_sign(0) : ret.set_sign(1);
+	ret.set_sign(asign == bsign ? 0 : 1);
 	ret._len = ret.valid_len();
 	return ret;
 }
