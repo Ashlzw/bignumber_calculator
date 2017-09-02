@@ -17,9 +17,10 @@ class bignumber
 	friend bignumber operator*(const bignumber &a, const bignumber &b);
 	friend bignumber operator/(const bignumber &a, const bignumber &b);
 public:
-	bignumber(int len, char sign);
-	bignumber(std::string &str);
+	bignumber() : _sign(0), _len(0), _data() {}
 	bignumber(const bignumber &bn);
+	bignumber(std::string &str);
+	bignumber(const char *str) : bignumber(std::string(str)) {}
 	~bignumber();
 
 	bignumber &operator=(const bignumber &a);
@@ -32,12 +33,11 @@ public:
 private:
 	char _sign;
 	int _len;
-	char *_data;
+	bignumber_data _data;
 
 	int valid_len();
 	
-	void init(int len, char sign) { _sign = sign; _len = len; _data = new char[len] {0}; }
-	void copy_from(char * data) { for (size_t i = 0; i < _len; i++) _data[i] = data[i]; }
+	void init(int len, char sign, const bignumber_data &dt) { _sign = sign; _len = len; _data = dt; }
 	void parse_bignumber(std::string &str);
 	void fill_data_from_str(const std::string &str);
 	
